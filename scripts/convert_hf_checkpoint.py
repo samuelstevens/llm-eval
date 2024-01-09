@@ -38,7 +38,7 @@ def convert_hf_checkpoint(input_dir: str, name: str, output_dir: str) -> None:
     input_dir = pathlib.Path(input_dir)
     output_dir = pathlib.Path(output_dir)
 
-    cfg = models.ModelArgs(models.configs[name])
+    cfg = models.ModelArgs(**models.configs[name])
     print(f"Model config {cfg.__dict__}")
 
     # Load the json file containing weight mapping

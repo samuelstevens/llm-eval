@@ -1,0 +1,6 @@
+isort
+numpy
+polars
+ruff
+safetensors
+sentencepiece==0.1.99
