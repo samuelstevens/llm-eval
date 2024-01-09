@@ -9,9 +9,9 @@ configs = {
 }
 
 
-def load_model(cfg, ckpt_path, device, precision):
+def load_model(config, ckpt_path, device, precision):
     with torch.device("meta"):
-        model = Transformer(cfg)
+        model = Transformer(config)
 
     ckpt = torch.load(ckpt_path, mmap=True, weights_only=True)
     model.load_state_dict(ckpt, assign=True)

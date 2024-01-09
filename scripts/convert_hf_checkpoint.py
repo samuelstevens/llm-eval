@@ -38,8 +38,8 @@ def convert_hf_checkpoint(input_dir: str, name: str, output_dir: str) -> None:
     input_dir = pathlib.Path(input_dir)
     output_dir = pathlib.Path(output_dir)
 
-    cfg = models.ModelArgs(**models.configs[name])
-    print(f"Model config {cfg.__dict__}")
+    config = models.ModelArgs(**models.configs[name])
+    print(f"Model config {config.__dict__}")
 
     # Load the json file containing weight mapping
     model_map_json = input_dir / "model.safetensors.index.json"
@@ -51,9 +51,9 @@ def convert_hf_checkpoint(input_dir: str, name: str, output_dir: str) -> None:
 
     def permute(w, n_head):
         return (
-            w.view(n_head, 2, cfg.head_dim // 2, cfg.dim)
+            w.view(n_head, 2, config.head_dim // 2, config.dim)
             .transpose(1, 2)
-            .reshape(cfg.head_dim * n_head, cfg.dim)
+            .reshape(config.head_dim * n_head, config.dim)
         )
 
     merged_result = {}
@@ -81,8 +81,8 @@ def convert_hf_checkpoint(input_dir: str, name: str, output_dir: str) -> None:
             q = final_result[key]
             k = final_result[key.replace("wq", "wk")]
             v = final_result[key.replace("wq", "wv")]
-            q = permute(q, cfg.n_head)
-            k = permute(k, cfg.n_local_heads)
+            q = permute(q, config.n_head)
+            k = permute(k, config.n_local_heads)
             final_result[key.replace("wq", "wqkv")] = torch.cat([q, k, v])
             del final_result[key]
             del final_result[key.replace("wq", "wk")]

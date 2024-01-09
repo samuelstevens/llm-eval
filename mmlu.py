@@ -140,13 +140,13 @@ if __name__ == "__main__":
     subjects = sorted(subjects)
     print(" ".join(subjects))
 
-    model_cfg = models.ModelArgs(**models.configs[args.model_name])
-    model = models.load_model(model_cfg, args.model_path, device, precision)
+    model_config = models.ModelArgs(**models.configs[args.model_name])
+    model = models.load_model(model_config, args.model_path, device, precision)
     tokenizer = models.load_tokenizer(args.tokenizer_path)
 
     # Set up caches. Only runs when max_seq_length is bigger than before.
     with torch.device(device):
-        model.setup_caches(max_batch_size=1, max_seq_length=model_cfg.block_size)
+        model.setup_caches(max_batch_size=1, max_seq_length=model_config.block_size)
 
     if not args.no_compile:
         # Use dynamic=True because the model has a variable number of prompt tokens.
