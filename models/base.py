@@ -115,7 +115,7 @@ class Transformer(torch.nn.Module):
         freqs_cis = self.freqs_cis[input_pos]
         x = self.tok_embeddings(idx)
 
-        for i, layer in enumerate(self.layers):
+        for layer in self.layers:
             x = layer(x, input_pos, freqs_cis, mask)
         x = self.norm(x)
         logits = self.output(x)
@@ -181,8 +181,9 @@ class Attention(torch.nn.Module):
         q = apply_rotary_emb(q, freqs_cis)
         k = apply_rotary_emb(k, freqs_cis)
 
-        # (sam) Since Meta wrote this model for speed, lambdas must compile under torch.compile. I did not expect this.
-        q, k, v = map(lambda x: x.transpose(1, 2), (q, k, v))
+        q = q.transpose(1, 2)
+        k = k.transpose(1, 2)
+        v = v.transpose(1, 2)
 
         if self.kv_cache is not None:
             k, v = self.kv_cache.update(input_pos, k, v)
