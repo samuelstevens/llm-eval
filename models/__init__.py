@@ -5,6 +5,7 @@ from .base import ModelArgs, Transformer
 
 configs = {
     "llama2-7b": dict(n_layer=32, n_head=32, dim=4096),
+    "vicuna-7b-v1.5": dict(n_layer=32, n_head=32, dim=4096),
     "llama2-13b": dict(n_layer=40, n_head=40, dim=5120),
 }
 

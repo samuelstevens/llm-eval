@@ -32,6 +32,32 @@ weight_map = {
 }
 
 
+def load_safetensors_ckpt(bin_files):
+    merged = {}
+    for file in sorted(bin_files):
+        with safetensors.safe_open(str(file), framework="pt", device="cpu") as fd:
+            for key in fd.keys():
+                merged[key] = fd.get_tensor(key)
+    return merged
+
+
+def load_torch_ckpt(bin_files):
+    merged = {}
+    for file in sorted(bin_files):
+        state_dict = torch.load(
+            str(file), map_location="cpu", mmap=True, weights_only=True
+        )
+        merged.update(state_dict)
+    return merged
+
+
+def load_bin_files(map_json: pathlib.Path):
+    with open(map_json) as fd:
+        bin_index = json.load(fd)
+    bin_files = {map_json.parent / bin for bin in bin_index["weight_map"].values()}
+    return bin_files
+
+
 @torch.inference_mode()
 def convert_hf_checkpoint(input_dir: str, name: str, output_dir: str) -> None:
     # Convert to pathlib
@@ -41,29 +67,20 @@ def convert_hf_checkpoint(input_dir: str, name: str, output_dir: str) -> None:
     config = models.ModelArgs(**models.configs[name])
     print(f"Model config {config.__dict__}")
 
-    # Load the json file containing weight mapping
-    model_map_json = input_dir / "model.safetensors.index.json"
-    assert model_map_json.is_file()
-
-    with open(model_map_json) as json_map:
-        bin_index = json.load(json_map)
-    bin_files = {input_dir / bin for bin in bin_index["weight_map"].values()}
-
-    def permute(w, n_head):
-        return (
-            w.view(n_head, 2, config.head_dim // 2, config.dim)
-            .transpose(1, 2)
-            .reshape(config.head_dim * n_head, config.dim)
-        )
-
-    merged_result = {}
-    for file in sorted(bin_files):
-        with safetensors.safe_open(str(file), framework="pt", device="cpu") as fd:
-            for key in fd.keys():
-                merged_result[key] = fd.get_tensor(key)
+    # Load the json file containing weight mapping and the weights
+    if (input_dir / "model.safetensors.index.json").is_file():
+        model_map_json = input_dir / "model.safetensors.index.json"
+        bin_files = load_bin_files(model_map_json)
+        merged = load_safetensors_ckpt(bin_files)
+    elif (input_dir / "pytorch_model.bin.index.json").is_file():
+        model_map_json = input_dir / "pytorch_model.bin.index.json"
+        bin_files = load_bin_files(model_map_json)
+        merged = load_torch_ckpt(bin_files)
+    else:
+        raise ValueError(f"No model map file in {input_dir}")
 
     final_result = {}
-    for key, value in merged_result.items():
+    for key, value in merged.items():
         if "layers" in key:
             abstract_key = re.sub(r"(\d+)", "{}", key)
             layer_num = re.search(r"\d+", key).group(0)
@@ -75,6 +92,13 @@ def convert_hf_checkpoint(input_dir: str, name: str, output_dir: str) -> None:
             new_key = weight_map[key]
 
         final_result[new_key] = value
+
+    def permute(w, n_head):
+        return (
+            w.view(n_head, 2, config.head_dim // 2, config.dim)
+            .transpose(1, 2)
+            .reshape(config.head_dim * n_head, config.dim)
+        )
 
     for key in tuple(final_result.keys()):
         if "wq" in key:

@@ -114,8 +114,8 @@ def evaluate(model, tokenizer, subject, dev_df, test_df, k):
 
         # Tokenize prompt
         tokens = generate.tokenize(tokenizer, prompt)
-        input_pos = torch.arange(0, tokens.size(0), device=device)
 
+        input_pos = torch.arange(0, tokens.size(0), device=device)
         logits = model(tokens.view(1, -1), input_pos)
         pred = letters[logits[0, -1, letter_tokens].argmax()]
 
@@ -123,7 +123,6 @@ def evaluate(model, tokenizer, subject, dev_df, test_df, k):
         corrects.append(correct)
 
     acc = np.mean(corrects)
-
 
     return acc, corrects
 
@@ -176,7 +175,7 @@ if __name__ == "__main__":
             acc * 100,
             time_s,
             time_s / len(corrects),
-            subject
+            subject,
         )
 
     weighted_acc = np.mean(all_corrects)
