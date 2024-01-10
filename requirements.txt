@@ -2,6 +2,8 @@ huggingface-hub
 isort
 numpy
 polars
+pyarrow
+seaborn
 ruff
 safetensors
 sentencepiece==0.1.99

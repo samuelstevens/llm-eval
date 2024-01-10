@@ -13,24 +13,6 @@ import torch
 
 import models
 
-# Map from Huggingface to models/base.py
-# TODO: the code to map from HF llama to models/base.py is not for phi2 or other models, so that code needs to become llama2-specific.
-weight_map = {
-    "model.embed_tokens.weight": "tok_embeddings.weight",
-    "model.layers.{}.self_attn.q_proj.weight": "layers.{}.attention.wq.weight",
-    "model.layers.{}.self_attn.k_proj.weight": "layers.{}.attention.wk.weight",
-    "model.layers.{}.self_attn.v_proj.weight": "layers.{}.attention.wv.weight",
-    "model.layers.{}.self_attn.o_proj.weight": "layers.{}.attention.wo.weight",
-    "model.layers.{}.self_attn.rotary_emb.inv_freq": None,
-    "model.layers.{}.mlp.gate_proj.weight": "layers.{}.feed_forward.w1.weight",
-    "model.layers.{}.mlp.up_proj.weight": "layers.{}.feed_forward.w3.weight",
-    "model.layers.{}.mlp.down_proj.weight": "layers.{}.feed_forward.w2.weight",
-    "model.layers.{}.input_layernorm.weight": "layers.{}.attention_norm.weight",
-    "model.layers.{}.post_attention_layernorm.weight": "layers.{}.ffn_norm.weight",
-    "model.norm.weight": "norm.weight",
-    "lm_head.weight": "output.weight",
-}
-
 
 def load_safetensors_ckpt(bin_files):
     merged = {}
@@ -79,6 +61,8 @@ def convert_hf_checkpoint(input_dir: str, name: str, output_dir: str) -> None:
     else:
         raise ValueError(f"No model map file in {input_dir}")
 
+    weight_map, extra_keys = models.weight_maps[args.name]
+
     final_result = {}
     for key, value in merged.items():
         if "layers" in key:
@@ -88,8 +72,12 @@ def convert_hf_checkpoint(input_dir: str, name: str, output_dir: str) -> None:
             if new_key is None:
                 continue
             new_key = new_key.format(layer_num)
-        else:
+        elif key in weight_map:
             new_key = weight_map[key]
+        elif key in extra_keys:
+            continue
+        else:
+            breakpoint()
 
         final_result[new_key] = value
 

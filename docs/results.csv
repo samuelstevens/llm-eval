@@ -4,4 +4,10 @@ llama2-7b,mmlu,test,acc,45.8,45.3
 llama2-13b,mmlu,val,acc,55.2,
 llama2-13b,mmlu,test,acc,55.0,54.8
 vicuna-7b-v1.5,mmlu,val,acc,49.4,
-vicuna-7b-v1.5,mmlu,test,acc,,49.8
+vicuna-7b-v1.5,mmlu,test,acc,49.6,49.8
+vicuna-13b-v1.5,mmlu,val,acc,55.8,
+vicuna-13b-v1.5,mmlu,test,acc,55.6,56.6
+llava-7b-v1.5,mmlu,val,acc,49.8,
+llava-7b-v1.5,mmlu,test,acc,50.3,
+llava-13b-v1.5,mmlu,val,acc,56.8,
+llava-13b-v1.5,mmlu,test,acc,56.0,
