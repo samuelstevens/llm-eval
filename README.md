@@ -44,6 +44,18 @@ cp \
   /local/scratch/stevens.994/models/torch/llama2-7b/
 ```
 
+## Quantize to use int8
+
+```sh
+python quantize.py \
+  --ckpt_path /research/nfs_su_809/workspace/stevens.994/models/torch/llama2-7b-chat/model.pth \
+  --model_name llama2-7b-chat \
+  --mode int8
+```
+
+This saves a model_int8.pth checkpoint.
+Typically int8 has little to no performance degradations for language models.
+
 ## Evaluate
 
 ```sh
@@ -52,3 +64,4 @@ python mmlu.py \
   --model_name llama2-7b \
   --model_path /local/scratch/stevens.994/models/torch/llama2-7b/model.pth
 ```
+

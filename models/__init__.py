@@ -1,8 +1,11 @@
+import logging
 
 import sentencepiece
 import torch
 
 from .base import ModelArgs, Transformer
+
+logger = logging.getLogger("lib/model")
 
 configs = {
     # Llama2
@@ -66,9 +69,17 @@ def load_model(config, ckpt_path, device, precision):
     with torch.device("meta"):
         model = Transformer(config)
 
+    if "int8" in str(ckpt_path):
+        logger.info("Using int8 weight-only quantization.")
+        from quantize import WeightOnlyInt8QuantHandler
+
+        simple_quantizer = WeightOnlyInt8QuantHandler(model)
+        model = simple_quantizer.convert_for_runtime()
+
     ckpt = torch.load(ckpt_path, mmap=True, weights_only=True)
     model.load_state_dict(ckpt, assign=True)
     model = model.to(device=device, dtype=precision)
+
     model.eval()
 
     return model
