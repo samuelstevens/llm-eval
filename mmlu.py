@@ -36,7 +36,7 @@ def get_args():
         type=str,
         help="tokenizer checkpoint. Looks in the same directory as --model_path if not set.",
     )
-    parser.add_argument("--no-compile", action="store_true", help="Skip torch.compile.")
+    parser.add_argument("--compile", action="store_true", help="Use torch.compile.")
     # Data
     parser.add_argument("--data", type=str, default="data/mmlu")
     parser.add_argument("--ntrain", type=int, default=5)
@@ -147,7 +147,7 @@ if __name__ == "__main__":
     with torch.device(device):
         model.setup_caches(max_batch_size=1, max_seq_length=model_config.block_size)
 
-    if not args.no_compile:
+    if args.compile:
         # Use dynamic=True because the model has a variable number of prompt tokens.
         model = torch.compile(
             model, mode="reduce-overhead", fullgraph=True, dynamic=True
