@@ -3,6 +3,7 @@ import torch._dynamo.config
 import torch._inductor.config
 from torch import Tensor
 
+import helpers
 from models import Transformer
 
 torch._inductor.config.coordinate_descent_tuning = True
@@ -23,7 +24,7 @@ def logits_to_probs(logits, temperature: float = 1.0, top_k: int | None = None):
     if top_k is not None:
         v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
         pivot = v.select(-1, -1).unsqueeze(-1)
-        logits = torch.where(logits < pivot, -float("Inf"), logits)
+        logits = torch.where(logits < pivot, -float("inf"), logits)
     probs = torch.nn.functional.softmax(logits, dim=-1)
     return probs
 
@@ -56,6 +57,7 @@ def decode_n_tokens(
     cur_token: Tensor,
     input_pos: Tensor,
     num_new_tokens: int,
+    eos_token: int | None = None,
     **sampling_kwargs,
 ):
     new_tokens, new_probs = [], []
@@ -71,9 +73,14 @@ def decode_n_tokens(
             new_probs.append(next_prob.clone())
             cur_token = next_token.view(1, -1)
 
+            # Stop early if we find an eos_token
+            if eos_token is not None and next_token == eos_token:
+                break
+
     return new_tokens, new_probs
 
 
+@helpers.timed
 @torch.no_grad()
 def generate(
     model: Transformer,
@@ -88,8 +95,6 @@ def generate(
         model (Transformer): Transformer instance from models/base.py
         prompt (Tensor): Vocab tokens with shape
     """
-
-    breakpoint()
 
     # create an empty tensor of the expected final shape and fill in the current tokens
     T = prompt.size(0)
@@ -118,9 +123,10 @@ def generate(
         max_new_tokens - 1,
         **sampling_kwargs,
     )
-    seq[T + 1 :] = torch.cat(generated_tokens)
+    generated_tokens = torch.cat(generated_tokens)
+    seq[T + 1 : T + 1 + generated_tokens.size(0)] = generated_tokens
 
-    return seq
+    return seq[: T + 1 + generated_tokens.size(0)]
 
 
 def tokenize(tokenizer, string, bos=True, device="cuda"):
@@ -131,4 +137,10 @@ def tokenize(tokenizer, string, bos=True, device="cuda"):
 
 
 def detokenize(tokenizer, tokens):
-    breakpoint()
+    if isinstance(tokens, torch.Tensor):
+        tokens = tokens.squeeze()
+        assert tokens.ndim == 1
+        tokens = tokens.tolist()
+
+    assert isinstance(tokens, list)
+    return tokenizer.decode(tokens)

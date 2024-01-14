@@ -1,13 +1,19 @@
+
 import sentencepiece
 import torch
 
 from .base import ModelArgs, Transformer
 
 configs = {
+    # Llama2
     "llama2-7b": dict(n_layer=32, n_head=32, dim=4096),
     "llama2-13b": dict(n_layer=40, n_head=40, dim=5120),
+    # Chat variants
+    "llama2-7b-chat": dict(n_layer=32, n_head=32, dim=4096),
+    # Vicuna
     "vicuna-7b-v1.5": dict(n_layer=32, n_head=32, dim=4096),
     "vicuna-13b-v1.5": dict(n_layer=40, n_head=40, dim=5120),
+    # LLaVA
     "llava-7b-v1.5": dict(n_layer=32, n_head=32, dim=4096),
     "llava-13b-v1.5": dict(n_layer=40, n_head=40, dim=5120),
 }
@@ -44,11 +50,16 @@ llava_extra_weights_keys = [
 weight_maps = {
     "llama2-7b": (_default_llama2_weight_map, set()),
     "llama2-13b": (_default_llama2_weight_map, set()),
+    "llama2-7b-chat": (_default_llama2_weight_map, set()),
     "vicuna-7b-v1.5": (_default_llama2_weight_map, set()),
     "vicuna-13b-v1.5": (_default_llama2_weight_map, set()),
     "llava-7b-v1.5": (_default_llama2_weight_map, set(llava_extra_weights_keys)),
     "llava-13b-v1.5": (_default_llama2_weight_map, set(llava_extra_weights_keys)),
 }
+
+
+def load_config(name):
+    return ModelArgs(**configs[name])
 
 
 def load_model(config, ckpt_path, device, precision):

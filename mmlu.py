@@ -139,7 +139,7 @@ if __name__ == "__main__":
     subjects = sorted(subjects)
     print(" ".join(subjects))
 
-    model_config = models.ModelArgs(**models.configs[args.model_name])
+    model_config = models.load_config(args.model_name)
     model = models.load_model(model_config, args.model_path, device, precision)
     tokenizer = models.load_tokenizer(args.tokenizer_path)
 
