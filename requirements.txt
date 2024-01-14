@@ -5,5 +5,7 @@ polars
 pyarrow
 seaborn
 ruff
+tqdm
 safetensors
 sentencepiece==0.1.99
+git+https://github.com/openai/human-eval
