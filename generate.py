@@ -38,7 +38,10 @@ def sample(logits, temperature: float = 1.0, top_k: int | None = None):
 def prefill(
     model: Transformer, x: Tensor, input_pos: Tensor, **sampling_kwargs
 ) -> Tensor:
-    # input_pos: [B, S]
+    """
+    Computes the KV cache for prompt tokens and returns logits for next-token-prediction.
+    """
+    # input_pos: [1, S]
     logits = model(x, input_pos)
     return sample(logits, **sampling_kwargs)[0]
 
@@ -57,7 +60,6 @@ def decode_n_tokens(
     cur_token: Tensor,
     input_pos: Tensor,
     num_new_tokens: int,
-    eos_token: int | None = None,
     **sampling_kwargs,
 ):
     new_tokens, new_probs = [], []
@@ -72,10 +74,6 @@ def decode_n_tokens(
             new_tokens.append(next_token.clone())
             new_probs.append(next_prob.clone())
             cur_token = next_token.view(1, -1)
-
-            # Stop early if we find an eos_token
-            if eos_token is not None and next_token == eos_token:
-                break
 
     return new_tokens, new_probs
 
