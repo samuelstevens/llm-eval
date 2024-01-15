@@ -181,6 +181,19 @@ def _vicuna_prompt(problem):
     return f"A chat between a curious user and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the user's questions.\nUSER: {user_msg}\nASSISTANT: "
 
 
+def _llava_prompt(problem):
+    user_msg_lines = []
+    user_msg_lines.append(
+        "Complete the following Python code without any tests or explanation."
+    )
+    user_msg_lines.append("```python")
+    user_msg_lines.append(problem.strip())
+    user_msg_lines.append("```")
+    user_msg = "\n".join(user_msg_lines)
+
+    return f"USER: {user_msg}\nASSISTANT: "
+
+
 def _llama2_chat_prompt(problem):
     return f"[INST] Complete the following Python code without any tests or explanation. Only write valid Python code. {problem} [/INST]"
 
@@ -188,6 +201,7 @@ def _llama2_chat_prompt(problem):
 prompts = {
     "vicuna-7b-v1.5": _vicuna_prompt,
     "llama2-7b-chat": _llama2_chat_prompt,
+    "llava-7b-v1.5": _llava_prompt,
 }
 
 
