@@ -42,6 +42,11 @@ def get_args():
     parser.add_argument("--batch-size", type=int, default=1)
     # Results
     parser.add_argument("--out", type=str, default="results/human_eval")
+    # Evaluation
+    parser.add_argument(
+        "--eval-only", action="store_true", help="Only evaluate the results file."
+    )
+
     args = parser.parse_args()
 
     if not args.tokenizer_path:
@@ -60,9 +65,9 @@ def get_args():
     return args
 
 
-def evaluation(
+def score(
     sample_file: str,
-    k: str = "1,10,100",
+    k: str = "1,10",
     n_workers: int = 4,
     timeout: float = 3.0,
     problem_file: str = human_eval.data.HUMAN_EVAL,
@@ -75,7 +80,8 @@ def evaluation(
     results = human_eval.evaluation.evaluate_functional_correctness(
         sample_file, k, n_workers, timeout, problem_file
     )
-    print(results)
+    fmt = ", ".join(f"pass@{k_i}: %.1f" for k_i in k)
+    logger.info(fmt, *[results[f"pass@{k_i}"] * 100 for k_i in k])
 
 
 def detokenize_batch(batch) -> tuple[list[str], int]:
@@ -215,35 +221,46 @@ if __name__ == "__main__":
     # * batch size 4
     args = get_args()
 
-    model_config = models.load_config(args.model_name)
-    model = models.load_model(model_config, args.model_path, device, precision)
-    tokenizer = models.load_tokenizer(args.tokenizer_path)
-
-    # Set up caches. Only runs when max_seq_length is bigger than before.
-    with torch.device(device):
-        model.setup_caches(max_batch_size=1, max_seq_length=model_config.block_size)
-
-    if args.compile:
-        generate.decode_one_token = torch.compile(
-            generate.decode_one_token, mode="reduce-overhead", fullgraph=True
-        )
-
     results_file = os.path.join(args.out, "results.jsonl")
-    # Make sure file is empty
-    open(results_file, "w").close()
 
-    def write_result(task_id, completion):
-        line = {"task_id": task_id, "completion": completion}
-        with open(results_file, "a") as fd:
-            fd.write(json.dumps(line) + "\n")
+    if not args.eval_only:
+        model_config = models.load_config(args.model_name)
+        model = models.load_model(model_config, args.model_path, device, precision)
+        tokenizer = models.load_tokenizer(args.tokenizer_path)
 
-    problems = human_eval.data.read_problems()
-    it = itertools.product(problems, range(args.samples_per_task))
-    for task_id, _ in tqdm(it, total=len(problems) * args.samples_per_task):
-        problem = problems[task_id]["prompt"]
-        prompt = prompts[args.model_name](problem)
-        completion = complete_code(prompt, args.max_tokens)
-        cleaned = clean_completion(completion)
-        write_result(task_id, cleaned)
+        if args.compile:
+            generate.decode_one_token = torch.compile(
+                generate.decode_one_token, mode="reduce-overhead", fullgraph=True
+            )
 
-    evaluation(results_file)
+        with torch.device(device):
+            model.setup_caches(
+                max_batch_size=args.batch_size, max_seq_length=model.config.block_size
+            )
+
+        err_msg = f"batch size ({args.batch_size}) must evenly divide samples/task ({args.samples_per_task})."
+        assert args.samples_per_task % args.batch_size == 0, err_msg
+
+        # Empty results file.
+        open(results_file, "w").close()
+
+        def write_result(task_id, completion):
+            line = {"task_id": task_id, "completion": completion}
+            with open(results_file, "a") as fd:
+                fd.write(json.dumps(line) + "\n")
+
+        problems = human_eval.data.read_problems()
+
+        it = itertools.product(
+            problems, range(args.samples_per_task // args.batch_size)
+        )
+        n_iter = len(problems) * args.samples_per_task // args.batch_size
+
+        for task_id, _ in tqdm(it, total=n_iter):
+            problem = problems[task_id]["prompt"]
+            prompt = prompts[args.model_name](problem)
+            for completion in complete_code(prompt):
+                cleaned = clean_completion(completion)
+                write_result(task_id, cleaned)
+
+    score(results_file)
