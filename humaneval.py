@@ -17,7 +17,7 @@ device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("
 precision = torch.bfloat16
 
 log_format = "[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s"
-logging.basicConfig(level=logging.INFO, format=log_format)
+logging.basicConfig(level=logging.DEBUG, format=log_format)
 logger = logging.getLogger("human-eval")
 
 out_file = "samples.jsonl"
@@ -37,11 +37,12 @@ def get_args():
     )
     parser.add_argument("--compile", action="store_true", help="Use torch.compile.")
     # Task
-    parser.add_argument("--samples-per-task", type=int, default=200)
-    parser.add_argument("--max_tokens", type=int, default=2048)
+    parser.add_argument("--samples-per-task", type=int, default=100)
     parser.add_argument("--batch-size", type=int, default=1)
+    parser.add_argument("--max-new-tokens", type=int, default=2048)
     # Results
     parser.add_argument("--out", type=str, default="results/human_eval")
+
     # Evaluation
     parser.add_argument(
         "--eval-only", action="store_true", help="Only evaluate the results file."
