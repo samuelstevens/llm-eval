@@ -22,6 +22,8 @@ def logits_to_probs(logits, temperature: float = 1.0, top_k: int | None = None):
     logits = logits / max(temperature, 1e-5)
 
     if top_k is not None:
+        breakpoint()
+        # TODO: check if this is batch safe (if logits is shape [B, V] instead of [V])
         v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
         pivot = v.select(-1, -1).unsqueeze(-1)
         logits = torch.where(logits < pivot, -float("inf"), logits)
@@ -30,7 +32,7 @@ def logits_to_probs(logits, temperature: float = 1.0, top_k: int | None = None):
 
 
 def sample(logits, temperature: float = 1.0, top_k: int | None = None):
-    probs = logits_to_probs(logits[0, -1], temperature, top_k)
+    probs = logits_to_probs(logits[:, -1], temperature, top_k)
     idx_next = multinomial_sample_one_no_sync(probs)
     return idx_next, probs
 
@@ -136,9 +138,7 @@ def tokenize(tokenizer, string, bos=True, device="cuda"):
 
 def detokenize(tokenizer, tokens):
     if isinstance(tokens, torch.Tensor):
-        tokens = tokens.squeeze()
-        assert tokens.ndim == 1
-        tokens = tokens.tolist()
+        tokens = tokens.view(-1).tolist()
 
     assert isinstance(tokens, list)
     return tokenizer.decode(tokens)

@@ -39,6 +39,7 @@ def get_args():
     # Task
     parser.add_argument("--samples-per-task", type=int, default=200)
     parser.add_argument("--max_tokens", type=int, default=2048)
+    parser.add_argument("--batch-size", type=int, default=1)
     # Results
     parser.add_argument("--out", type=str, default="results/human_eval")
     args = parser.parse_args()
@@ -77,53 +78,94 @@ def evaluation(
     print(results)
 
 
+def detokenize_batch(batch) -> tuple[list[str], int]:
+    texts = []
+    n_tokens = 0
+    for tokens in batch:
+        eos_pos = (tokens == tokenizer.eos_id()).nonzero()
+        if eos_pos.numel() == 0:
+            eos_pos = tokens.numel()
+        elif eos_pos.numel() == 1:
+            eos_pos = eos_pos.item()
+        else:
+            eos_pos = eos_pos.min()
+
+        texts.append(generate.detokenize(tokenizer, tokens[: eos_pos + 1]))
+        n_tokens += eos_pos + 1
+
+    return texts, n_tokens
+
+
+def decode_n_tokens(
+    model: models.Transformer,
+    cur_token: torch.Tensor,
+    input_pos: torch.Tensor,
+    **sampling_kwargs,
+):
+    seen_eos = torch.zeros((args.batch_size, 1), device=device)
+    new_tokens = []
+    for i in range(args.max_new_tokens - 1):
+        # Actually better for Inductor to codegen attention here
+        with torch.backends.cuda.sdp_kernel(
+            enable_flash=False, enable_mem_efficient=False, enable_math=True
+        ):
+            next_token, _ = generate.decode_one_token(
+                model, cur_token, input_pos, **sampling_kwargs
+            )
+            input_pos += 1
+            new_tokens.append(next_token.clone())
+            # view() prevents compile() from complaining about value re-use.
+            cur_token = next_token.view(args.batch_size, -1)
+
+            # Stop early if all sequences in batch have seen the eos
+            seen_eos[cur_token == tokenizer.eos_id()] = True
+            if seen_eos.all():
+                break
+
+    return new_tokens
+
+
 @helpers.timed
 @torch.no_grad()
 def complete(prompt, **sampling_kwargs) -> torch.Tensor:
     # create an empty tensor of the expected final shape and fill in the current tokens
-    T = prompt.size(0)
-    T_new = T + args.max_tokens
+    B, T = prompt.shape
+    T_new = T + args.max_new_tokens
     max_seq_length = min(T_new, model.config.block_size)
 
     device = prompt.device
     with torch.device(device):
-        model.setup_caches(max_batch_size=1, max_seq_length=max_seq_length)
+        model.setup_caches(max_batch_size=B, max_seq_length=max_seq_length)
 
     # create an empty tensor of the expected final shape and fill in the current tokens
     input_pos = torch.arange(0, T, device=device)
 
-    next_token = generate.prefill(
-        model, prompt.view(1, -1), input_pos, **sampling_kwargs
-    )
-
+    next_tokens = generate.prefill(model, prompt, input_pos, **sampling_kwargs)
     input_pos = torch.tensor([T], device=device, dtype=torch.int)
 
-    generated_tokens, _ = generate.decode_n_tokens(
+    generated_tokens = decode_n_tokens(
         model,
-        next_token.view(1, -1),
+        next_tokens,
         input_pos,
-        args.max_tokens - 1,
-        eos_token=tokenizer.eos_id(),
         **sampling_kwargs,
     )
-    return torch.cat([next_token] + generated_tokens)
+    return torch.cat(generated_tokens, dim=1)
 
 
-def complete_code(prompt: str, max_new_tokens) -> str:
+def complete_code(prompts: str) -> list[str]:
     """
-    Only generates the completed code.
+    Returns args.batch_size completions for a prompt.
     """
-    tokens = generate.tokenize(tokenizer, prompt)
+    tokens = generate.tokenize(tokenizer, prompt).expand(args.batch_size, -1)
 
     new_tokens, time_s = complete(tokens)
-    completion = generate.detokenize(tokenizer, new_tokens)
-    n_tokens = new_tokens.size(0)
+    completions, n_tokens = detokenize_batch(new_tokens)
 
     logger.debug(
-        "%d tokens, %.1f secs, %.1f tokens/sec", n_tokens, time_s, n_tokens / time_s
+        "%d toks, %.1f secs, %.1f toks/sec", n_tokens, time_s, n_tokens / time_s
     )
 
-    return completion
+    return completions
 
 
 def _vicuna_prompt(problem):
