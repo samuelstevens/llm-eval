@@ -43,11 +43,6 @@ def get_args():
     # Results
     parser.add_argument("--out", type=str, default="results/human_eval")
 
-    # Evaluation
-    parser.add_argument(
-        "--eval-only", action="store_true", help="Only evaluate the results file."
-    )
-
     args = parser.parse_args()
 
     if not args.tokenizer_path:

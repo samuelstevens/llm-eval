@@ -24,6 +24,14 @@ wget https://people.eecs.berkeley.edu/~hendrycks/data.tar
 tar -xvf data.tar
 ```
 
+### Human Eval
+
+```sh
+git clone https://github.com/samuelstevens/human-eval.git
+cd human-eval
+pip install -e .
+```
+
 ## Download Models
 
 You can use `scripts/download.py` to download models.
@@ -65,3 +73,19 @@ python mmlu.py \
   --model_path /local/scratch/stevens.994/models/torch/llama2-7b/model.pth
 ```
 
+```sh
+python humaneval.py \
+  --model_name llava-7b-v1.5 \
+  --model_path /research/nfs_su_809/workspace/stevens.994/models/torch/llava-7b-v1.5/model.pth \
+  --max-new-tokens 1024 \
+  --batch-size 24 \
+  --samples-per-task 120 \
+  --compile \
+  --out results/human_eval/bf16
+```
+
+Then run
+
+```sh
+evaluate_functional_correctness results/human_eval/bf16/llava-7b-v1.5/results.jsonl --k 1,3,5,10
+```
